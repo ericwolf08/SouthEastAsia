@@ -1,10 +1,10 @@
 package ericwolf.southeastasia;
 
-import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.FragmentActivity;
-import android.support.v7.app.AlertDialog;
-import android.widget.EditText;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -14,9 +14,22 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMarkerClickListener {
 
     private GoogleMap mMap;
+
+    private Marker myMarker;
+    private Map<Marker,String> markerUrl = new LinkedHashMap<>();
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,63 +39,94 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+    }
+
+    private void createMarker(double lat, double lng, String title, String image, String url) {
+        LatLng latlng = new LatLng(lat, lng);
+        MarkerOptions markerOptions = new MarkerOptions();
+        markerOptions.position(latlng);
+        markerOptions.title(title);
+
+        InfoWindowData info = new InfoWindowData();
+        info.setImage(image);
+
+        myMarker = mMap.addMarker(markerOptions);
+        myMarker.setTag(info);
+        markerUrl.put(myMarker, url);
     }
 
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
+        CustomInfoWindowGoogleMaps customInfoWindow = new CustomInfoWindowGoogleMaps(this);
+        mMap.setInfoWindowAdapter(customInfoWindow);
 
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(sydney);
-        markerOptions.title("Marker in Sydney");
-        markerOptions.snippet("This is my spot!");
+        createMarker(16.798307, 96.149612, "Shwedagon Paya", "shwedagon_paya", "https://www.lonelyplanet.com/myanmar-burma/yangon/attractions/shwedagon-paya/a/poi-sig/1092872/1002117");
 
-        mMap.addMarker(markerOptions);
-        mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
+        try {
+            if (new Date().after(sdf.parse("2019-04-01"))) {
+                createMarker(13.441257, 103.858759, "Bayon", "bayon", "https://www.lonelyplanet.com/cambodia/attractions/bayon/a/poi-sig/500534/1002117");
+            }
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+
+        List<Map.Entry<Marker,String>> entryList = new ArrayList<>(markerUrl.entrySet());
+        Map.Entry<Marker,String> lastEntry = entryList.get(entryList.size()-1);
+
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(lastEntry.getKey().getPosition()));
+
+        mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
-            public void onInfoWindowClick(Marker marker) {
-                AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(MapsActivity.this);
+            public boolean onMarkerClick(final Marker marker) {
 
-                final EditText et = new EditText(MapsActivity.this);
+                new Handler().postDelayed(new Runnable() {
 
-                // set prompts.xml to alertdialog builder
-                alertDialogBuilder.setView(et);
+                    @Override
+                    public void run() {
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(marker.getPosition(), 17), 4000, null);
 
-                // set dialog message
-                alertDialogBuilder.setCancelable(false).setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
                     }
-                });
+                }, 300);
 
-                // create alert dialog
-                AlertDialog alertDialog = alertDialogBuilder.create();
-                // show it
-                alertDialog.show();
+
+                if (!marker.isInfoWindowShown()) {
+                    marker.showInfoWindow();
+                } else {
+                    marker.hideInfoWindow();
+                }
+
+                mMap.getUiSettings().setMapToolbarEnabled(true);
+                mMap.getUiSettings().setAllGesturesEnabled(true);
+
+                return false;
             }
         });
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+
+
+
+        mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
+
+            @Override
+            public void onInfoWindowClick(Marker marker) {
+
+                Uri uriUrl = Uri.parse(markerUrl.get(marker));
+                Intent launchBrowser = new Intent(Intent.ACTION_VIEW, uriUrl);
+                startActivity(launchBrowser);
+
+            }
+
+        });
+
     }
 
 
-
-
-    /** Called when the user clicks a marker. */
     @Override
-    public boolean onMarkerClick(final Marker marker) {
-
+    public boolean onMarkerClick(Marker marker) {
         return false;
     }
 }
